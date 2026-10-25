@@ -37,10 +37,20 @@
 
 #define THREADS_PER_BLOCK 128
 // Tamanho do tile de K/V (numero de colunas j processadas por vez).
-// Mantido pequeno de proposito para a memoria compartilhada caber
-// folgadamente no limite de 48KB por bloco mesmo com D maior (ate 128),
-// sem precisar de opt-in de memoria compartilhada dinamica maior.
-#define BLOCK_N 32
+//
+// Historico: comecou em 32. Com THREADS_PER_BLOCK=128, isso significava
+// que nas fases de calculo de score e de softmax (que paralelizam sobre
+// as j colunas do tile, nao sobre D) so 32 das 128 threads de cada bloco
+// faziam algum trabalho - as outras 96 ficavam ociosas em todo tile, em
+// toda linha. O benchmark do Nivel 1 confirmou o efeito: o kernel tiled
+// ficou mais lento que o ingenuo para N >= 1024, mesmo usando muito menos
+// memoria. Subir para 64 dobra a ocupacao nessas fases (64/128 threads
+// ativas) e reduz pela metade o numero de tiles (e de barreiras
+// __syncthreads() por linha). Ainda cabe com folga no limite de 48KB de
+// memoria compartilhada por bloco para D <= 64 (o maior D usado neste
+// projeto); para D maior seria necessario reduzir BLOCK_N de novo ou usar
+// opt-in de memoria compartilhada dinamica maior (fora do escopo atual).
+#define BLOCK_N 64
 
 __global__ void flash_attention_tiled_kernel(
     const float* __restrict__ Q,

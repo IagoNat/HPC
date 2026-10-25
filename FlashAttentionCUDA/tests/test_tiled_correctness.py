@@ -19,14 +19,16 @@ from python.reference import reference_attention
 from python.naive_attention import naive_attention
 from python.flash_attention_tiled import flash_attention_tiled
 
-# Inclui N menores, iguais e maiores que BLOCK_N (32) do kernel tiled,
-# para exercitar 1 tile e multiplos tiles (inclusive tile final parcial).
+# Inclui N menores, iguais e maiores que BLOCK_N (64, atualizado apos o
+# benchmark do Nivel 1 mostrar baixa ocupacao com BLOCK_N=32) do kernel
+# tiled, para exercitar 1 tile e multiplos tiles (inclusive tile final
+# parcial).
 TEST_CASES = [
     (1, 1, 16, 32),    # N < BLOCK_N
-    (1, 1, 32, 32),    # N == BLOCK_N
+    (1, 1, 64, 32),    # N == BLOCK_N
     (1, 1, 65, 32),    # N > BLOCK_N, nao multiplo
-    (2, 2, 128, 64),
-    (2, 4, 256, 64),
+    (2, 2, 128, 64),   # 2 tiles exatos
+    (2, 4, 256, 64),   # 4 tiles exatos
 ]
 
 RTOL = 1e-3

@@ -27,7 +27,7 @@ notebooks/   notebooks Colab — ponto de entrada para rodar tudo com GPU
 
 ## Nível 1 (atual)
 
-- `kernels/flash_attention_tiled.cu` — tiling (`BLOCK_N=32`) + softmax online, nunca materializa a matriz N×N.
+- `kernels/flash_attention_tiled.cu` — tiling (`BLOCK_N=64`) + softmax online, nunca materializa a matriz N×N. `BLOCK_N` começou em 32 e subiu para 64 depois que o benchmark mostrou baixa ocupação (só 32 das 128 threads por bloco ativas nas fases de score/softmax).
 - `python/flash_attention_tiled.py`, `tests/test_tiled_correctness.py`, `python/benchmark.py`.
 - `notebooks/01_tiled_flash_attention.ipynb`.
 - Ajuste fino de `BLOCK_N` fica para o Nível 2.
