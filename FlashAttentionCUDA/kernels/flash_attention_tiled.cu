@@ -38,19 +38,24 @@
 #define THREADS_PER_BLOCK 128
 // Tamanho do tile de K/V (numero de colunas j processadas por vez).
 //
-// Historico: comecou em 32. Com THREADS_PER_BLOCK=128, isso significava
-// que nas fases de calculo de score e de softmax (que paralelizam sobre
-// as j colunas do tile, nao sobre D) so 32 das 128 threads de cada bloco
-// faziam algum trabalho - as outras 96 ficavam ociosas em todo tile, em
-// toda linha. O benchmark do Nivel 1 confirmou o efeito: o kernel tiled
-// ficou mais lento que o ingenuo para N >= 1024, mesmo usando muito menos
-// memoria. Subir para 64 dobra a ocupacao nessas fases (64/128 threads
-// ativas) e reduz pela metade o numero de tiles (e de barreiras
-// __syncthreads() por linha). Ainda cabe com folga no limite de 48KB de
-// memoria compartilhada por bloco para D <= 64 (o maior D usado neste
-// projeto); para D maior seria necessario reduzir BLOCK_N de novo ou usar
-// opt-in de memoria compartilhada dinamica maior (fora do escopo atual).
-#define BLOCK_N 64
+// Experimento de tuning (Nivel 1, 25/10): comecou em 32. Hipotese inicial:
+// com THREADS_PER_BLOCK=128, so 32 das 128 threads de cada bloco faziam
+// trabalho nas fases de score/softmax (que paralelizam sobre as j colunas
+// do tile) - as outras 96 ficavam ociosas. Tentamos BLOCK_N=64 pra dobrar
+// essa ocupacao local. Resultado medido (benchmark, T4): PIOROU em todos
+// os N testados (ex. N=2048: 118ms -> 178ms), nao melhorou. Explicacao
+// mais provavel: k_tile/v_tile sao os maiores consumidores de memoria
+// compartilhada do kernel, e dobrar BLOCK_N dobra o tamanho deles - isso
+// reduz pela metade quantos blocos cabem residentes POR SM ao mesmo tempo
+// (memoria compartilhada e um recurso por SM, compartilhado entre os
+// blocos residentes). Como este kernel tem um bloco por linha de consulta
+// (B*H*N blocos, tipicamente muito mais que SMs disponiveis), o paralelismo
+// real vem de varios blocos rodando concorrentemente por SM - e isso
+// importa mais do que a ocupacao de threads DENTRO de um unico bloco.
+// Conclusao: voltamos para BLOCK_N=32 (melhor dos dois pontos medidos).
+// Ajuste fino de verdade (explorar varios valores sistematicamente, nao
+// so dois pontos) fica para o Nivel 2.
+#define BLOCK_N 32
 
 __global__ void flash_attention_tiled_kernel(
     const float* __restrict__ Q,
